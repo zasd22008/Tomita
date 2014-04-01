@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -8,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Xml;
 using System.Xml.Serialization;
+using System.Xml.XPath;
 
 namespace Tomita
 {
@@ -51,21 +53,105 @@ namespace Tomita
 
 
             //1.) Получаем список id статей по шаблону "Зимние Олимпийские игры {год}"
-            var olympicGames = GetOlympicArticles();
+            //var olympicGames = GetOlympicArticles();
 
             //2.) Находим и парсим каждую статью с таким id-шником
-            FillOlympicGames(olympicGames);
+            //FillOlympicGames(olympicGames);
 
-            
             //3.) Сохраняем данные в файл
-            SaveGames(olympicGames);
+            //SaveGames(olympicGames);
 
             //4.) Вызываем томиту
+            //RunTomita();
 
-            //5.) Дополняем название страны данными о прочем..
-          
+            //5.) Парсим файл с выводом
+            var list = ParseDebugFile();
+
+            if (!list.Any())
+            {
+                Console.WriteLine("Нет информации!");
+                return;
+            }
+            //6.) Дополняем название страны данными о прочем..
+
+            var olympicGames = Load();
+
+            var game = olympicGames.FirstOrDefault(a => a.Title != null && a.Title.StartsWith(list[0] + " "));
+
+            if (game == null)
+                Console.WriteLine("Нет информации!");
+            else
+            {
+                Console.WriteLine("Дополнительная информация о {0}:", game.Title);
+                Console.WriteLine("ИД статьи {0}", game.ArticleId);
+                Console.WriteLine("Количество стран {0}", game.CountriesCount);
+                Console.WriteLine("Дата окончания {0}", game.EndDate);
+                Console.WriteLine("Кол-во медалей {0}", game.MedalsCount);
+                Console.WriteLine("Открывающий {0}", game.OpenMan);
+                Console.WriteLine("Кол-во участников {0}", game.ParticipantsCount);
+                Console.WriteLine("Слоган {0}", game.Slogan);
+                Console.WriteLine("Дата начало {0}", game.StartDate);
+                Console.WriteLine("Название {0}", game.Title);
+                Console.WriteLine("Город {0}", game.Town);
+                Console.WriteLine("Год проведения {0}", game.Year);                
+            }
+
+
             Console.ReadLine();             
         }
+
+        private static List<OlympicGames> Load()
+        {
+            return (List<OlympicGames>) new XmlSerializer(typeof (List<OlympicGames>)).Deserialize(File.OpenRead("olympic.xml"));
+        }
+
+        private static List<string> ParseDebugFile()
+        {
+            var fileName = "debug.html";
+
+            var list = new List<string>();
+
+            XPathDocument doc = new XPathDocument(fileName);
+            XPathNavigator nav = doc.CreateNavigator();
+
+            // Compile a standard XPath expression
+
+            XPathExpression expr;
+            expr = nav.Compile("/body/table[1]/tbody/tr/td[1]/a");
+            XPathNodeIterator iterator = nav.Select(expr);
+
+            // Iterate on the node set
+
+            try
+            {
+                while (iterator.MoveNext())
+                {
+                    XPathNavigator nav2 = iterator.Current.Clone();
+                    //Console.WriteLine(nav2.InnerXml);
+
+                    var str = nav2.InnerXml;
+
+                    if (!str.Any(c => c != 'X' && c != 'I' && c != 'V'))
+                        list.Add(str);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            //Console.ReadKey();
+
+            return list;
+        }
+
+        //private static void RunTomita()
+        //{
+        //    var process = new Process();
+        //    process.StartInfo.FileName = "tomitaparser.exe";
+
+        //    process.Start();
+        //    process
+        //}
 
         private static void SaveGames(List<OlympicGames> list)
         {
